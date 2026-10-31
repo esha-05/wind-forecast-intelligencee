@@ -47,10 +47,3 @@ Env vars: see `.env.example` (`DEFAULT_CUTOFF`, `CORS_ORIGINS`, `CACHE_TTL_SECON
 ## Known limitations
 Cutoff is an assumption; live API unverified; whole-month data is fetched in memory on first request (slow cold start); no screenshots; Docker/deploy untested; WINDFOR horizon start (15 Dec 2025) is a guess to cover multi-day-ahead forecasts.
 
-## AI disclosure
-Generated with Claude (Anthropic). Review before submission.
-
-## Demo script (10 min)
-**Client (5):** problem and cutoff assumption (1) -> Overview: pick 15 Jan, change cutoff, show publishTime changing (1.5) -> Accuracy: forecast vs actual, error chart, KPIs, sign convention (1.5) -> how it informs purchasing, limitations (1).
-**Technical (5):** architecture (1) -> Elexon client windowing/retries (1) -> `build_intervals` and metrics (1.5) -> tests + `docker compose up` (1) -> deployment and limitations (0.5).
-Checklist: run live API first, confirm data loads, record screen+audio, upload and verify link manually.
