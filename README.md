@@ -1,49 +1,382 @@
-# Wind Forecast Intelligence
+Wind Forecast Intelligence
 
-Dashboard for a UK utility to see (a) the latest national wind forecast available at a day-ahead decision time and (b) how accurate it was, for delivery days in January 2026. Uses only Elexon **FUELHH** (actual, `fuelType=WIND`) and **WINDFOR** (forecast).
+A UK wind generation forecast intelligence dashboard designed to support day-ahead energy procurement decisions. The application displays national wind generation forecasts, compares forecasts against actual generation, and evaluates forecast accuracy for January 2026.
 
-## Status (honest)
-| Item | State |
-|---|---|
-| Backend pytest (7 tests, synthetic fixtures) | Passed in build sandbox |
-| Frontend vitest (3 tests) and `npm run build` | Passed in build sandbox |
-| **Live Elexon integration** | **NOT verified.** The sandbox could not reach Elexon. Endpoint paths, parameters and field names (`startTime`, `publishTime`, `generation`, `fuelType`) follow the public v1 stream API from memory. Run once against the live API and adjust `backend/app/clients/elexon.py` if needed. Units are not confirmed, so the UI shows values as reported. |
-| Docker / Compose | Config written, **not run** |
-| Vercel / backend deployment, live URL | **Not done** (see steps below) |
+Live application: https://wind-forecast-intelligencee-ek1m.vercel.app/
 
-## Architecture
-React/Vite/Recharts (`frontend/`) -> FastAPI (`backend/app/api`) -> `services/store.py` (in-memory TTL cache) -> `clients/elexon.py` (httpx, 7-day windows, retry/backoff on 429/5xx, 30s timeout) -> `services/processing.py` (pandas selection + metrics).
+Backend API: https://wind-forecast-intelligencee.onrender.com/
 
-## Methodology
-- Timestamps parsed to UTC (January = GMT). Grid is 48 x 30-min intervals per day (1,488 for the month).
-- **Cutoff assumption (not an official Elexon/market rule):** `DEFAULT_CUTOFF=08:00` UTC on the day *before* delivery. Change via env var or the UI.
-- Per interval: keep forecasts with `publishTime <= cutoff`, take the latest `publishTime`; later publications are never used. No eligible forecast -> `missing_forecast`.
-- Null generation is never turned into 0; such rows are dropped and the interval is marked missing. Duplicates are removed.
-- Error = forecast − actual (positive = overestimate). MAE, RMSE, bias use matched intervals only. MAPE excludes |actual| < 1 (source units) and reports the excluded count. Coverage = matched / expected.
+GitHub repository: https://github.com/esha-05/wind-forecast-intelligencee
 
-## API
-`GET /api/health`, `GET /api/forecast?date&cutoff`, `GET /api/accuracy?date&cutoff`, `GET /api/accuracy/summary?start_date&end_date&cutoff`, `POST /api/refresh` (re-fetches; cached 1h otherwise). Invalid input -> 422; Elexon failure -> 502. No fallback to fake data.
+1. Project Overview
 
-## Run
-```bash
-# backend
-cd backend && python -m venv .venv && . .venv/bin/activate && pip install -r requirements.txt
-uvicorn app.main:app --reload          # :8000
+The dashboard helps a UK energy procurement team understand:
+
+The latest eligible national wind generation forecast available at a day-ahead decision cutoff.
+
+Actual national wind generation for each delivery hour.
+
+Forecast errors and accuracy metrics.
+
+Daily forecast performance and forecast-versus-actual trends.
+
+The application uses only Elexon BMRS datasets:
+
+FUELHH: Actual half-hourly generation filtered to fuelType=WIND.
+
+WINDFOR: Published national wind generation forecasts.
+
+2. Architecture
+
+Frontend: React, TypeScript, Vite, Recharts
+Backend: Python, FastAPI, Pandas
+Data source: Elexon BMRS API
+Deployment: Vercel (frontend), Render (backend)
+Containerisation: Docker and Docker Compose configuration
+
+Data flow
+
+React Dashboard → FastAPI → Data Store and Cache → Elexon BMRS API → Data Processing and Accuracy Metrics → Dashboard
+
+The backend retrieves Elexon data, processes forecast and actual generation records, selects eligible forecasts, calculates accuracy metrics, and returns results to the frontend.
+
+3. Data Methodology
+
+Forecast selection
+
+Delivery period: January 1–31, 2026.
+
+Decision cutoff: 08:00 UTC on the day before delivery.
+
+The cutoff is an explicit project assumption, not an official Elexon market rule.
+
+Forecasts published after the cutoff are excluded.
+
+For each delivery hour, the latest eligible publishTime is selected.
+
+Forecasts are matched with actual generation using hourly delivery timestamps.
+
+Actual generation processing
+
+FUELHH provides half-hourly actual generation records.
+
+The two half-hourly readings within each delivery hour are averaged to produce an hourly actual generation value. An hourly value is only created when both half-hourly readings are available.
+
+No missing generation values are replaced with zero.
+
+Forecast accuracy metrics
+
+Forecast error is calculated as:
+
+Error = Forecast - Actual
+
+MAE: Mean Absolute Error.
+
+RMSE: Root Mean Squared Error.
+
+Bias: Average signed forecast error.
+
+MAPE: Mean Absolute Percentage Error.
+
+Coverage: Matched hourly intervals divided by expected hourly intervals.
+
+Positive bias indicates forecast overestimation; negative bias indicates underestimation.
+
+MAPE excludes intervals where the absolute actual generation is below 1 source unit. Metrics are calculated using matched intervals only.
+
+4. January 2026 Results
+
+The following are pooled monthly metrics calculated across all 744 matched hourly intervals.
+
+Metric
+
+January 2026
+
+Expected hourly intervals
+
+744
+
+Matched hourly intervals
+
+744
+
+Coverage
+
+100%
+
+MAE
+
+2,142.12
+
+RMSE
+
+2,611.70
+
+Bias
+
++1,851.90
+
+MAPE
+
+22.38%
+
+Positive errors
+
+633
+
+Negative errors
+
+111
+
+MAPE exclusions
+
+0
+
+Key observation: The positive monthly bias indicates that the selected forecasts generally overestimated actual wind generation during January 2026.
+
+All metric values are expressed in the source generation units returned by Elexon.
+
+5. Independent Data Validation
+
+The deployed application was independently compared with records retrieved directly from the Elexon BMRS API.
+
+FUELHH actual generation
+
+Validation
+
+Result
+
+Expected half-hourly records
+
+1,488
+
+Retrieved records
+
+1,488
+
+Unique timestamps
+
+1,488
+
+Duplicate timestamps
+
+0
+
+Incomplete settlement days
+
+0
+
+Constructed hourly actuals
+
+744
+
+WINDFOR forecast selection
+
+Validation
+
+Result
+
+Raw forecast records retrieved
+
+28,616
+
+Eligible delivery hours selected
+
+744
+
+Missing raw forecasts
+
+0
+
+Forecast value mismatches
+
+0
+
+Publication timestamp mismatches
+
+0
+
+Application-to-source comparison
+
+Across all 744 January delivery hours:
+
+Forecast values matched the independently selected latest eligible Elexon forecasts.
+
+Actual values matched independently aggregated FUELHH readings.
+
+Selected publication timestamps matched.
+
+No missing forecast or actual records were found in the comparison.
+
+All 31 deployed API requests succeeded.
+
+These checks validate the returned January dataset and the application's selection and aggregation results against the retrieved Elexon records.
+
+6. API Endpoints
+
+Method
+
+Endpoint
+
+Purpose
+
+GET
+
+/api/health
+
+Backend health check
+
+GET
+
+/api/forecast?date&cutoff
+
+Forecast data
+
+GET
+
+/api/accuracy?date&cutoff
+
+Daily accuracy results
+
+GET
+
+/api/accuracy/summary?start_date&end_date&cutoff
+
+Summary results
+
+POST
+
+/api/refresh
+
+Refresh cached source data
+
+Invalid inputs return HTTP 422. Upstream data failures return HTTP 502.
+
+The backend uses an in-memory cache with a configurable one-hour default TTL.
+
+7. Project Structure
+
+wind-forecast-app/
+├── backend/
+│   ├── app/
+│   │   ├── api/
+│   │   ├── clients/
+│   │   ├── core/
+│   │   └── services/
+│   ├── tests/
+│   ├── Dockerfile
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   ├── Dockerfile
+│   ├── index.html
+│   └── package.json
+├── docker-compose.yml
+├── .env.example
+└── README.md
+
+8. Run Locally
+
+Backend
+
+cd backend
+
+python -m venv .venv
+
+# Windows Git Bash
+source .venv/Scripts/activate
+
+pip install -r requirements.txt
+
+uvicorn app.main:app --reload --port 8001
+
+Backend documentation:
+
+http://127.0.0.1:8001/docs
+
+Frontend
+
+Open another terminal:
+
+cd frontend
+
+npm install
+
+npm run dev
+
+Frontend:
+
+http://localhost:5173
+
+For local development, configure frontend/.env.local:
+
+VITE_API_URL=http://127.0.0.1:8001
+
+Run backend tests
+
+cd backend
 pytest
-# frontend
-cd frontend && npm install && npm run dev   # :5173 (VITE_API_URL defaults to http://localhost:8000)
+
+Run frontend tests and build
+
+cd frontend
 npm test
-# docker
-cp .env.example .env && docker compose up --build -d   # app :5173, API :8000
-docker compose ps; docker compose logs -f; docker compose down
-```
-Env vars: see `.env.example` (`DEFAULT_CUTOFF`, `CORS_ORIGINS`, `CACHE_TTL_SECONDS`, `CHUNK_DAYS`, `HTTP_TIMEOUT_SECONDS`, `ELEXON_BASE_URL`, `VITE_API_URL`).
+npm run build
 
-## Deployment (manual)
-- Backend (Render/Railway/Heroku-compatible): root `backend/`, Docker or `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, health check `/api/health`, set `CORS_ORIGINS=<vercel url>`.
-- Frontend (Vercel): root `frontend/`, build `npm run build`, output `dist`, env `VITE_API_URL=<backend url>`.
-- Live URL: _not deployed yet_.
+9. Deployment
 
-## Known limitations
-Cutoff is an assumption; live API unverified; whole-month data is fetched in memory on first request (slow cold start); no screenshots; Docker/deploy untested; WINDFOR horizon start (15 Dec 2025) is a guess to cover multi-day-ahead forecasts.
+Frontend – Vercel
 
+Repository: GitHub project.
+
+Root directory: frontend.
+
+Framework: Vite.
+
+Build command: npm run build.
+
+Output directory: dist.
+
+Environment variable:
+
+VITE_API_URL=https://wind-forecast-intelligencee.onrender.com
+
+Live URL:
+
+https://wind-forecast-intelligencee-ek1m.vercel.app/
+
+Backend – Render
+
+Repository: GitHub project.
+
+Root directory: backend.
+
+Runtime: Python.
+
+Build command: pip install -r requirements.txt.
+
+Start command:
+
+uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+Health check:
+
+https://wind-forecast-intelligencee.onrender.com/api/health
+
+10. Known Limitations
+
+The 08:00 UTC day-ahead cutoff is a project assumption and can be changed.
+
+The dashboard evaluates published wind generation forecasts; it does not train a separate machine learning forecasting model.
+
+Wind forecast accuracy alone cannot determine the utility's complete procurement requirement. Demand forecasts, other generation sources, interconnector flows, and market prices would also be required.
+
+The application uses an in-memory cache, which is not shared across multiple backend instances.
+
+The forecast and actual generation values are displayed in the source units returned by Elexon.
+
+Historical January 2026 evaluation results should not be interpreted as a guarantee of future forecast performance.
+
+11. AI Usage Disclosure
+
+AI tools, including ChatGPT (OpenAI) and Claude (Anthropic), were used to assist with development, debugging, code review, documentation, and project explanations. The implementation and validation results were reviewed and tested against the application and Elexon API.
