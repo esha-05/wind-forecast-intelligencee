@@ -59,7 +59,7 @@ However, forecast values can differ significantly from actual generation, creati
 
 Displays hourly national wind generation forecasts for the selected delivery date, including the daily mean forecast and missing interval count.
 
-![Forecast Overview](frontend/docs/Forecast_Overview.png)
+![Forecast Overview](frontend/docs/Forecast_overview.png)
 
 ### Accuracy Analysis
 
