@@ -54,9 +54,18 @@ However, forecast values can differ significantly from actual generation, creati
 
 <!-- Add your actual dashboard screenshots here after uploading them to the repository. -->
 
-| Forecast Overview | Accuracy Analytics |
-|---|---|
-| Add overview screenshot here | Add accuracy screenshot here |
+
+### Forecast Overview
+
+Displays hourly national wind generation forecasts for the selected delivery date, including the daily mean forecast and missing interval count.
+
+![Forecast Overview](frontend/docs/Forecast_Overview.png)
+
+### Accuracy Analysis
+
+Compares forecast generation against actual wind generation and displays MAE, RMSE, Bias, MAPE and data coverage.
+
+![Accuracy Analysis](frontend/docs/Accuracy_analysis.png)
 
 ## 🏗️ System Architecture
 
